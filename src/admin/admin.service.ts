@@ -99,13 +99,19 @@ export class AdminService {
 
   /**
    * Mark a drone as broken or fixed.
-   * Broken: triggers handoff if drone has an active order.
-   * Fixed: sets drone to IDLE but DOES NOT cancel the handoff job.
+   *
+   * Broken: marks the drone's active job as FAILED, sets the order to
+   * PENDING_HANDOFF, and creates a new HANDOFF job at the drone's last
+   * known position so another drone can pick up the goods.
+   *
+   * Fixed: sets the drone back to IDLE. Per the spec, any existing OPEN
+   * handoff job is NOT cancelled — once a handoff has been requested, its
+   * lifecycle continues independently to avoid leaving an order stranded.
    */
   async updateDroneStatus(
     droneId: string,
     status: DroneStatusUpdate,
-  ): Promise<{ drone: Drone; handoffJob?: Job }> {
+  ): Promise<{ drone: Drone; handoffJob: Job | undefined }> {
     const drone = await this.droneRepository.findOne({
       where: { id: droneId },
     });
@@ -141,27 +147,38 @@ export class AdminService {
           const order = await manager.findOne(Order, {
             where: { id: activeJob.orderId },
           });
-          if (order) {
-            order.status = OrderStatus.PENDING_HANDOFF;
-            await manager.save(Order, order);
 
-            handoffJob = manager.create(Job, {
-              orderId: order.id,
-              type: JobType.HANDOFF,
-              status: JobStatus.OPEN,
-              pickupLat: drone.latitude ?? order.originLat,
-              pickupLng: drone.longitude ?? order.originLng,
-              dropoffLat: order.destLat,
-              dropoffLng: order.destLng,
-            });
-            handoffJob = await manager.save(Job, handoffJob);
+          if (!order) {
+            throw new NotFoundException(
+              `Order ${activeJob.orderId} not found for active job ${activeJob.id}`,
+            );
           }
+
+          if (drone.latitude == null || drone.longitude == null) {
+            throw new BadRequestException(
+              'Drone position is unknown; cannot create handoff job',
+            );
+          }
+
+          order.status = OrderStatus.PENDING_HANDOFF;
+          await manager.save(Order, order);
+
+          handoffJob = manager.create(Job, {
+            orderId: order.id,
+            type: JobType.HANDOFF,
+            status: JobStatus.OPEN,
+            pickupLat: drone.latitude,
+            pickupLng: drone.longitude,
+            dropoffLat: order.destLat,
+            dropoffLng: order.destLng,
+          });
+          handoffJob = await manager.save(Job, handoffJob);
         }
 
         return { drone, handoffJob };
       });
     } else {
-      // FIXED — just set to IDLE, handoff job stays open
+      // FIXED — set to IDLE, handoff job stays open (see JSDoc above)
       if (drone.status !== DroneStatus.BROKEN) {
         throw new BadRequestException(
           'Only broken drones can be marked as fixed',
@@ -170,7 +187,7 @@ export class AdminService {
 
       drone.status = DroneStatus.IDLE;
       await this.droneRepository.save(drone);
-      return { drone };
+      return { drone, handoffJob: undefined };
     }
   }
 }
