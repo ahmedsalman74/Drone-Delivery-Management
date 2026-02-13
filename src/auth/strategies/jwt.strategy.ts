@@ -3,7 +3,8 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { JwtPayload } from '../../common/decorators/current-user.decorator';
 
-export const JWT_SECRET = 'drone-delivery-jwt-secret-2024';
+export const JWT_SECRET =
+  process.env.JWT_SECRET || 'drone-delivery-jwt-secret-2024';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
