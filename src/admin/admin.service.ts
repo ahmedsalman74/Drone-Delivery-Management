@@ -13,12 +13,7 @@ import { Job } from '../job/entities/job.entity';
 import { AdminOrderQueryDto } from './dto/admin-order-query.dto';
 import { UpdateOrderLocationDto } from './dto/update-order-location.dto';
 import { DroneStatusUpdate } from './dto/update-drone-status.dto';
-import {
-  OrderStatus,
-  DroneStatus,
-  JobStatus,
-  JobType,
-} from '../common/enums';
+import { OrderStatus, DroneStatus, JobStatus, JobType } from '../common/enums';
 
 @Injectable()
 export class AdminService {

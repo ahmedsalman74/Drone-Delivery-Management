@@ -444,7 +444,7 @@ describe('Drone Delivery API (E2E)', () => {
 
     it('admin: should update order location', async () => {
       // Get first order
-      const ordersRes = await request(app.getHttpServer())
+      await request(app.getHttpServer())
         .get('/admin/orders?page=1&limit=1')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
@@ -484,7 +484,9 @@ describe('Drone Delivery API (E2E)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
-      const brokenDrone = dronesRes.body.find((d: any) => d.status === 'broken');
+      const brokenDrone = dronesRes.body.find(
+        (d: any) => d.status === 'broken',
+      );
       if (brokenDrone) {
         const res = await request(app.getHttpServer())
           .patch(`/admin/drones/${brokenDrone.id}/status`)

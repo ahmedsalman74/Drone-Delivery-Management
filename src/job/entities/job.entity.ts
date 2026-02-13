@@ -60,7 +60,10 @@ export class Job {
   @JoinColumn({ name: 'orderId' })
   order!: Order;
 
-  @ManyToOne(() => Drone, (drone) => drone.jobs, { nullable: true, onDelete: 'SET NULL' })
+  @ManyToOne(() => Drone, (drone) => drone.jobs, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
   @JoinColumn({ name: 'droneId' })
   drone!: Drone | null;
 }

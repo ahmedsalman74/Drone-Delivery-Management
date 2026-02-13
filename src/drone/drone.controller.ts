@@ -42,7 +42,9 @@ export class DroneController {
 
   @Post('jobs/:jobId/grab')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Grab an order from a location (origin or broken drone)' })
+  @ApiOperation({
+    summary: 'Grab an order from a location (origin or broken drone)',
+  })
   @ApiResponse({ status: 200, description: 'Order grabbed successfully' })
   @ApiResponse({ status: 400, description: 'Job not in reserved status' })
   async grabOrder(
@@ -68,7 +70,8 @@ export class DroneController {
   @ApiOperation({ summary: 'Mark drone as broken (triggers order handoff)' })
   @ApiResponse({
     status: 200,
-    description: 'Drone marked broken. Handoff job created if order was active.',
+    description:
+      'Drone marked broken. Handoff job created if order was active.',
   })
   async markBroken(@CurrentUser() user: JwtPayload) {
     return this.droneService.markBroken(user.name);
@@ -79,10 +82,7 @@ export class DroneController {
     summary: 'Update drone location and receive status heartbeat',
   })
   @ApiResponse({ status: 200, description: 'Heartbeat recorded' })
-  async heartbeat(
-    @CurrentUser() user: JwtPayload,
-    @Body() dto: HeartbeatDto,
-  ) {
+  async heartbeat(@CurrentUser() user: JwtPayload, @Body() dto: HeartbeatDto) {
     return this.droneService.heartbeat(user.name, dto);
   }
 

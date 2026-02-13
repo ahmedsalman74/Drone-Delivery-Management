@@ -4,7 +4,10 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderStatus } from '../../common/enums';
 
 export class AdminOrderQueryDto {
-  @ApiPropertyOptional({ description: 'Filter by order status', enum: OrderStatus })
+  @ApiPropertyOptional({
+    description: 'Filter by order status',
+    enum: OrderStatus,
+  })
   @IsOptional()
   @IsEnum(OrderStatus)
   status?: OrderStatus;

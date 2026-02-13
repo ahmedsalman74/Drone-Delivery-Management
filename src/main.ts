@@ -25,7 +25,7 @@ async function bootstrap() {
     .setTitle('Drone Delivery Management API')
     .setDescription(
       'RESTful API for managing drone-based delivery operations. ' +
-      'Supports three user roles: admin, enduser, and drone.',
+        'Supports three user roles: admin, enduser, and drone.',
     )
     .setVersion('1.0')
     .addBearerAuth()
@@ -39,4 +39,4 @@ async function bootstrap() {
   console.log(`📖 Swagger docs at http://localhost:3000/api/docs`);
 }
 
-bootstrap();
+void bootstrap();

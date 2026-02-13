@@ -54,7 +54,9 @@ export class OrderService {
    * Also cancels any associated OPEN jobs.
    */
   async withdrawOrder(orderId: string, userName: string): Promise<Order> {
-    const order = await this.orderRepository.findOne({ where: { id: orderId } });
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId },
+    });
 
     if (!order) {
       throw new NotFoundException('Order not found');
@@ -102,7 +104,9 @@ export class OrderService {
    * Get detailed order info including progress, drone location, and ETA.
    */
   async getOrderDetail(orderId: string, userName: string) {
-    const order = await this.orderRepository.findOne({ where: { id: orderId } });
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId },
+    });
 
     if (!order) {
       throw new NotFoundException('Order not found');
@@ -124,7 +128,10 @@ export class OrderService {
     let etaMinutes: number | null = null;
 
     if (activeJob?.drone) {
-      if (activeJob.drone.latitude !== null && activeJob.drone.longitude !== null) {
+      if (
+        activeJob.drone.latitude !== null &&
+        activeJob.drone.longitude !== null
+      ) {
         droneLocation = {
           latitude: activeJob.drone.latitude,
           longitude: activeJob.drone.longitude,

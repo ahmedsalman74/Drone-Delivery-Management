@@ -110,7 +110,9 @@ export class DroneService {
       job.status = JobStatus.IN_PROGRESS;
 
       // Update order status
-      const order = await manager.findOne(Order, { where: { id: job.orderId } });
+      const order = await manager.findOne(Order, {
+        where: { id: job.orderId },
+      });
       if (order) {
         order.status = OrderStatus.IN_PROGRESS;
         await manager.save(Order, order);
@@ -148,14 +150,18 @@ export class DroneService {
     return this.dataSource.transaction(async (manager) => {
       if (result === CompletionResult.DELIVERED) {
         job.status = JobStatus.COMPLETED;
-        const order = await manager.findOne(Order, { where: { id: job.orderId } });
+        const order = await manager.findOne(Order, {
+          where: { id: job.orderId },
+        });
         if (order) {
           order.status = OrderStatus.DELIVERED;
           await manager.save(Order, order);
         }
       } else {
         job.status = JobStatus.FAILED;
-        const order = await manager.findOne(Order, { where: { id: job.orderId } });
+        const order = await manager.findOne(Order, {
+          where: { id: job.orderId },
+        });
         if (order) {
           order.status = OrderStatus.FAILED;
           await manager.save(Order, order);
@@ -173,7 +179,9 @@ export class DroneService {
   /**
    * Mark drone as broken — creates handoff job for current order.
    */
-  async markBroken(droneName: string): Promise<{ drone: Drone; handoffJob?: Job }> {
+  async markBroken(
+    droneName: string,
+  ): Promise<{ drone: Drone; handoffJob?: Job }> {
     const drone = await this.findOrCreateByName(droneName);
 
     if (drone.status === DroneStatus.BROKEN) {
@@ -201,7 +209,9 @@ export class DroneService {
         await manager.save(Job, activeJob);
 
         // Mark order as pending handoff
-        const order = await manager.findOne(Order, { where: { id: activeJob.orderId } });
+        const order = await manager.findOne(Order, {
+          where: { id: activeJob.orderId },
+        });
         if (order) {
           order.status = OrderStatus.PENDING_HANDOFF;
           await manager.save(Order, order);

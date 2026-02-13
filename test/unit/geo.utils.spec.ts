@@ -1,4 +1,7 @@
-import { haversineDistance, calculateETA } from '../../src/common/utils/geo.utils';
+import {
+  haversineDistance,
+  calculateETA,
+} from '../../src/common/utils/geo.utils';
 
 describe('Geo Utils', () => {
   describe('haversineDistance', () => {
