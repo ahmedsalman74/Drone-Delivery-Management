@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const request = require('supertest');
+import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/filters';
 import { DataSource } from 'typeorm';

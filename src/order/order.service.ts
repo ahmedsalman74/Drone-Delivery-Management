@@ -5,8 +5,10 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere } from 'typeorm';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { Repository, FindOptionsWhere, DataSource } from 'typeorm';
 import { Order } from './entities/order.entity';
+import { Job } from '../job/entities/job.entity';
 import { JobService } from '../job/job.service';
 import { OrderStatus, JobType, JobStatus } from '../common/enums';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -19,70 +21,82 @@ export class OrderService {
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
     private readonly jobService: JobService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
    * Submit a new order and create an initial DELIVERY job.
+   * Wrapped in a transaction so both order and job succeed or both roll back.
    */
   async createOrder(submittedBy: string, dto: CreateOrderDto): Promise<Order> {
-    const order = this.orderRepository.create({
-      submittedBy,
-      originLat: dto.originLat,
-      originLng: dto.originLng,
-      destLat: dto.destLat,
-      destLng: dto.destLng,
-      status: OrderStatus.PENDING,
+    return this.dataSource.transaction(async (manager) => {
+      const order = manager.create(Order, {
+        submittedBy,
+        originLat: dto.originLat,
+        originLng: dto.originLng,
+        destLat: dto.destLat,
+        destLng: dto.destLng,
+        status: OrderStatus.PENDING,
+      });
+
+      const savedOrder = await manager.save(Order, order);
+
+      // Create the initial delivery job inside the same transaction
+      const job = manager.create(Job, {
+        orderId: savedOrder.id,
+        type: JobType.DELIVERY,
+        status: JobStatus.OPEN,
+        pickupLat: dto.originLat,
+        pickupLng: dto.originLng,
+        dropoffLat: dto.destLat,
+        dropoffLng: dto.destLng,
+      });
+      await manager.save(Job, job);
+
+      return savedOrder;
     });
-
-    const savedOrder = await this.orderRepository.save(order);
-
-    // Create the initial delivery job
-    await this.jobService.createJob({
-      orderId: savedOrder.id,
-      type: JobType.DELIVERY,
-      pickupLat: dto.originLat,
-      pickupLng: dto.originLng,
-      dropoffLat: dto.destLat,
-      dropoffLng: dto.destLng,
-    });
-
-    return savedOrder;
   }
 
   /**
    * Withdraw an order — only allowed if status is PENDING.
    * Also cancels any associated OPEN jobs.
+   * Wrapped in a transaction to prevent race conditions with drone reservation.
    */
   async withdrawOrder(orderId: string, userName: string): Promise<Order> {
-    const order = await this.orderRepository.findOne({
-      where: { id: orderId },
-    });
+    return this.dataSource.transaction(async (manager) => {
+      const order = await manager.findOne(Order, {
+        where: { id: orderId },
+      });
 
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-
-    if (order.submittedBy !== userName) {
-      throw new ForbiddenException('You can only withdraw your own orders');
-    }
-
-    if (order.status !== OrderStatus.PENDING) {
-      throw new BadRequestException(
-        `Cannot withdraw order: order is "${order.status}". Only pending orders can be withdrawn.`,
-      );
-    }
-
-    // Cancel all associated OPEN jobs
-    const jobs = await this.jobService.findJobsByOrderId(orderId);
-    for (const job of jobs) {
-      if (job.status === JobStatus.OPEN) {
-        job.status = JobStatus.CANCELLED;
-        await this.jobService.save(job);
+      if (!order) {
+        throw new NotFoundException('Order not found');
       }
-    }
 
-    order.status = OrderStatus.WITHDRAWN;
-    return this.orderRepository.save(order);
+      if (order.submittedBy !== userName) {
+        throw new ForbiddenException('You can only withdraw your own orders');
+      }
+
+      if (order.status !== OrderStatus.PENDING) {
+        throw new BadRequestException(
+          `Cannot withdraw order: order is "${order.status}". Only pending orders can be withdrawn.`,
+        );
+      }
+
+      // Cancel all associated OPEN jobs within the same transaction
+      const jobs = await manager.find(Job, {
+        where: { orderId },
+      });
+      for (const job of jobs) {
+        if (job.status === JobStatus.OPEN) {
+          job.status = JobStatus.CANCELLED;
+          await manager.save(Job, job);
+        }
+      }
+
+      order.status = OrderStatus.WITHDRAWN;
+      return manager.save(Order, order);
+    });
   }
 
   /**
