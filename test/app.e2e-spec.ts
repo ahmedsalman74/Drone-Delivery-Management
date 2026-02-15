@@ -31,12 +31,12 @@ describe('Drone Delivery API (E2E)', () => {
     app.useGlobalFilters(new AllExceptionsFilter());
     await app.init();
 
-    // Clear all tables to ensure a clean state between test runs
+    // Clear all collections to ensure a clean state between test runs
     const dataSource = app.get(DataSource);
     const entities = dataSource.entityMetadatas;
     for (const entity of entities) {
-      const repository = dataSource.getRepository(entity.name);
-      await repository.clear();
+      const repository = dataSource.getMongoRepository(entity.name);
+      await repository.deleteMany({});
     }
   });
 
@@ -399,6 +399,21 @@ describe('Drone Delivery API (E2E)', () => {
   // ─── ADMIN ENDPOINTS ───────────────────────────────────
 
   describe('Admin Endpoints', () => {
+    // Refresh tokens to ensure they're valid after all prior tests
+    beforeAll(async () => {
+      const adminRes = await request(app.getHttpServer())
+        .post('/auth/token')
+        .send({ name: 'admin-user', type: 'admin' })
+        .expect(200);
+      adminToken = adminRes.body.accessToken;
+
+      const enduserRes = await request(app.getHttpServer())
+        .post('/auth/token')
+        .send({ name: 'user-alice', type: 'enduser' })
+        .expect(200);
+      enduserToken = enduserRes.body.accessToken;
+    });
+
     it('admin: should list all orders in bulk', async () => {
       const res = await request(app.getHttpServer())
         .get('/admin/orders')
@@ -516,6 +531,27 @@ describe('Drone Delivery API (E2E)', () => {
   // ─── EDGE CASES ────────────────────────────────────────
 
   describe('Edge Cases', () => {
+    // Refresh tokens to ensure they're valid after all prior tests
+    beforeAll(async () => {
+      const enduserRes = await request(app.getHttpServer())
+        .post('/auth/token')
+        .send({ name: 'user-alice', type: 'enduser' })
+        .expect(200);
+      enduserToken = enduserRes.body.accessToken;
+
+      const droneRes = await request(app.getHttpServer())
+        .post('/auth/token')
+        .send({ name: 'drone-alpha', type: 'drone' })
+        .expect(200);
+      droneToken = droneRes.body.accessToken;
+
+      const drone2Res = await request(app.getHttpServer())
+        .post('/auth/token')
+        .send({ name: 'drone-beta', type: 'drone' })
+        .expect(200);
+      drone2Token = drone2Res.body.accessToken;
+    });
+
     it('should reject order withdrawal after pickup', async () => {
       // Submit order
       const orderRes = await request(app.getHttpServer())
