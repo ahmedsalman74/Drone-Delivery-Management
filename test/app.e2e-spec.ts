@@ -38,7 +38,20 @@ describe('Drone Delivery API (E2E)', () => {
       const repository = dataSource.getMongoRepository(entity.name);
       await repository.deleteMany({});
     }
-  });
+
+    // Bootstrap: sign up an admin user to get an admin token
+    // This token is needed to call POST /auth/token (admin-only endpoint)
+    const adminSignup = await request(app.getHttpServer())
+      .post('/auth/signup')
+      .send({
+        email: 'admin@test.com',
+        password: 'Admin123!',
+        name: 'admin-user',
+        type: 'admin',
+      })
+      .expect(201);
+    adminToken = adminSignup.body.accessToken;
+  }, 60000);
 
   afterAll(async () => {
     await app.close();
@@ -47,19 +60,33 @@ describe('Drone Delivery API (E2E)', () => {
   // ─── AUTH ───────────────────────────────────────────────
 
   describe('Auth - POST /auth/token', () => {
-    it('should generate a token for admin', async () => {
-      const res = await request(app.getHttpServer())
+    it('should reject unauthenticated token generation', async () => {
+      await request(app.getHttpServer())
         .post('/auth/token')
-        .send({ name: 'admin-user', type: 'admin' })
-        .expect(200);
-
-      expect(res.body.accessToken).toBeDefined();
-      adminToken = res.body.accessToken;
+        .send({ name: 'drone-alpha', type: 'drone' })
+        .expect(401);
     });
 
-    it('should generate a token for enduser', async () => {
+    it('should reject non-admin token generation', async () => {
+      // Generate an enduser token first
+      const enduserRes = await request(app.getHttpServer())
+        .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'temp-user', type: 'enduser' })
+        .expect(200);
+
+      // Enduser should not be able to generate tokens
+      await request(app.getHttpServer())
+        .post('/auth/token')
+        .set('Authorization', `Bearer ${enduserRes.body.accessToken}`)
+        .send({ name: 'drone-alpha', type: 'drone' })
+        .expect(403);
+    });
+
+    it('should generate a token for enduser (admin auth)', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'user-alice', type: 'enduser' })
         .expect(200);
 
@@ -67,9 +94,10 @@ describe('Drone Delivery API (E2E)', () => {
       enduserToken = res.body.accessToken;
     });
 
-    it('should generate a token for drone', async () => {
+    it('should generate a token for drone (admin auth)', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'drone-alpha', type: 'drone' })
         .expect(200);
 
@@ -77,9 +105,10 @@ describe('Drone Delivery API (E2E)', () => {
       droneToken = res.body.accessToken;
     });
 
-    it('should generate a token for second drone', async () => {
+    it('should generate a token for second drone (admin auth)', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'drone-beta', type: 'drone' })
         .expect(200);
 
@@ -89,6 +118,7 @@ describe('Drone Delivery API (E2E)', () => {
     it('should reject invalid type', async () => {
       await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'test', type: 'invalid' })
         .expect(400);
     });
@@ -96,6 +126,7 @@ describe('Drone Delivery API (E2E)', () => {
     it('should reject missing name', async () => {
       await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ type: 'admin' })
         .expect(400);
     });
@@ -403,12 +434,14 @@ describe('Drone Delivery API (E2E)', () => {
     beforeAll(async () => {
       const adminRes = await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'admin-user', type: 'admin' })
         .expect(200);
       adminToken = adminRes.body.accessToken;
 
       const enduserRes = await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'user-alice', type: 'enduser' })
         .expect(200);
       enduserToken = enduserRes.body.accessToken;
@@ -535,18 +568,21 @@ describe('Drone Delivery API (E2E)', () => {
     beforeAll(async () => {
       const enduserRes = await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'user-alice', type: 'enduser' })
         .expect(200);
       enduserToken = enduserRes.body.accessToken;
 
       const droneRes = await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'drone-alpha', type: 'drone' })
         .expect(200);
       droneToken = droneRes.body.accessToken;
 
       const drone2Res = await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'drone-beta', type: 'drone' })
         .expect(200);
       drone2Token = drone2Res.body.accessToken;
@@ -592,9 +628,10 @@ describe('Drone Delivery API (E2E)', () => {
     });
 
     it('should prevent other user from viewing orders', async () => {
-      // Create second enduser
+      // Create second enduser (requires admin token)
       const user2Res = await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'user-bob', type: 'enduser' })
         .expect(200);
 
