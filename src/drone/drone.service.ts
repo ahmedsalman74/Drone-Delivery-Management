@@ -6,16 +6,15 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MongoRepository } from 'typeorm';
+import { randomUUID } from 'crypto';
 import { Drone } from './entities/drone.entity';
+import { Job } from '../job/entities/job.entity';
+import { Order } from '../order/entities/order.entity';
 import { JobService } from '../job/job.service';
 import { DroneStatus, JobStatus, JobType, OrderStatus } from '../common/enums';
 import { HeartbeatDto } from './dto/heartbeat.dto';
 import { CompletionResult } from './dto/complete-job.dto';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
-import { Job } from '../job/entities/job.entity';
-import { Order } from '../order/entities/order.entity';
 
 @Injectable()
 export class DroneService {
@@ -23,9 +22,11 @@ export class DroneService {
 
   constructor(
     @InjectRepository(Drone)
-    private readonly droneRepository: Repository<Drone>,
-    @InjectDataSource()
-    private readonly dataSource: DataSource,
+    private readonly droneRepository: MongoRepository<Drone>,
+    @InjectRepository(Job)
+    private readonly jobRepository: MongoRepository<Job>,
+    @InjectRepository(Order)
+    private readonly orderRepository: MongoRepository<Order>,
     private readonly jobService: JobService,
   ) {}
 
@@ -35,7 +36,11 @@ export class DroneService {
   async findOrCreateByName(name: string): Promise<Drone> {
     let drone = await this.droneRepository.findOne({ where: { name } });
     if (!drone) {
-      drone = this.droneRepository.create({ name, status: DroneStatus.IDLE });
+      drone = this.droneRepository.create({
+        id: randomUUID(),
+        name,
+        status: DroneStatus.IDLE,
+      });
       drone = await this.droneRepository.save(drone);
       this.logger.log(`Auto-registered new drone: ${name}`);
     }
@@ -44,7 +49,6 @@ export class DroneService {
 
   /**
    * Reserve the first available open job.
-   * Uses a transaction to ensure atomicity and optimistic locking.
    */
   async reserveJob(droneName: string): Promise<Job> {
     const drone = await this.findOrCreateByName(droneName);
@@ -59,30 +63,28 @@ export class DroneService {
       throw new ConflictException('Drone already has an active job');
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      // Find the first open job
-      const openJob = await manager.findOne(Job, {
-        where: { status: JobStatus.OPEN },
-        order: { createdAt: 'ASC' },
-        relations: ['order'],
-      });
-
-      if (!openJob) {
-        throw new NotFoundException('No open jobs available');
-      }
-
-      // Optimistic lock — if version changed, save will throw
-      openJob.droneId = drone.id;
-      openJob.status = JobStatus.RESERVED;
-
-      // Mark drone as busy
-      drone.status = DroneStatus.BUSY;
-      await manager.save(Drone, drone);
-
-      const savedJob = await manager.save(Job, openJob);
-      savedJob.drone = drone;
-      return savedJob;
+    // Find the first open job
+    const openJob = await this.jobRepository.findOne({
+      where: { status: JobStatus.OPEN },
+      order: { createdAt: 'ASC' },
     });
+
+    if (!openJob) {
+      throw new NotFoundException('No open jobs available');
+    }
+
+    // Reserve the job
+    openJob.droneId = drone.id;
+    openJob.status = JobStatus.RESERVED;
+    openJob.version = (openJob.version || 1) + 1;
+
+    // Mark drone as busy
+    drone.status = DroneStatus.BUSY;
+    await this.droneRepository.save(drone);
+
+    const savedJob = await this.jobRepository.save(openJob);
+    savedJob.drone = drone;
+    return savedJob;
   }
 
   /**
@@ -106,20 +108,18 @@ export class DroneService {
       );
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      job.status = JobStatus.IN_PROGRESS;
+    job.status = JobStatus.IN_PROGRESS;
 
-      // Update order status
-      const order = await manager.findOne(Order, {
-        where: { id: job.orderId },
-      });
-      if (order) {
-        order.status = OrderStatus.IN_PROGRESS;
-        await manager.save(Order, order);
-      }
-
-      return manager.save(Job, job);
+    // Update order status
+    const order = await this.orderRepository.findOne({
+      where: { id: job.orderId },
     });
+    if (order) {
+      order.status = OrderStatus.IN_PROGRESS;
+      await this.orderRepository.save(order);
+    }
+
+    return this.jobRepository.save(job);
   }
 
   /**
@@ -147,33 +147,31 @@ export class DroneService {
       );
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      if (result === CompletionResult.DELIVERED) {
-        job.status = JobStatus.COMPLETED;
-        const order = await manager.findOne(Order, {
-          where: { id: job.orderId },
-        });
-        if (order) {
-          order.status = OrderStatus.DELIVERED;
-          await manager.save(Order, order);
-        }
-      } else {
-        job.status = JobStatus.FAILED;
-        const order = await manager.findOne(Order, {
-          where: { id: job.orderId },
-        });
-        if (order) {
-          order.status = OrderStatus.FAILED;
-          await manager.save(Order, order);
-        }
+    if (result === CompletionResult.DELIVERED) {
+      job.status = JobStatus.COMPLETED;
+      const order = await this.orderRepository.findOne({
+        where: { id: job.orderId },
+      });
+      if (order) {
+        order.status = OrderStatus.DELIVERED;
+        await this.orderRepository.save(order);
       }
+    } else {
+      job.status = JobStatus.FAILED;
+      const order = await this.orderRepository.findOne({
+        where: { id: job.orderId },
+      });
+      if (order) {
+        order.status = OrderStatus.FAILED;
+        await this.orderRepository.save(order);
+      }
+    }
 
-      // Drone becomes idle
-      drone.status = DroneStatus.IDLE;
-      await manager.save(Drone, drone);
+    // Drone becomes idle
+    drone.status = DroneStatus.IDLE;
+    await this.droneRepository.save(drone);
 
-      return manager.save(Job, job);
-    });
+    return this.jobRepository.save(job);
   }
 
   /**
@@ -188,50 +186,44 @@ export class DroneService {
       throw new BadRequestException('Drone is already marked as broken');
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      drone.status = DroneStatus.BROKEN;
-      await manager.save(Drone, drone);
+    drone.status = DroneStatus.BROKEN;
+    await this.droneRepository.save(drone);
 
-      // Find active job for this drone
-      const activeJob = await manager.findOne(Job, {
-        where: [
-          { droneId: drone.id, status: JobStatus.RESERVED },
-          { droneId: drone.id, status: JobStatus.IN_PROGRESS },
-        ],
-        relations: ['order'],
+    // Find active job for this drone
+    const activeJob = await this.jobService.findActiveJobByDroneId(drone.id);
+
+    let handoffJob: Job | undefined;
+
+    if (activeJob) {
+      // Mark current job as failed
+      activeJob.status = JobStatus.FAILED;
+      await this.jobRepository.save(activeJob);
+
+      // Mark order as pending handoff
+      const order = await this.orderRepository.findOne({
+        where: { id: activeJob.orderId },
       });
+      if (order) {
+        order.status = OrderStatus.PENDING_HANDOFF;
+        await this.orderRepository.save(order);
 
-      let handoffJob: Job | undefined;
-
-      if (activeJob) {
-        // Mark current job as failed
-        activeJob.status = JobStatus.FAILED;
-        await manager.save(Job, activeJob);
-
-        // Mark order as pending handoff
-        const order = await manager.findOne(Order, {
-          where: { id: activeJob.orderId },
+        // Create handoff job — pickup is at the broken drone's location
+        const newJob = this.jobRepository.create({
+          id: randomUUID(),
+          orderId: order.id,
+          type: JobType.HANDOFF,
+          status: JobStatus.OPEN,
+          pickupLat: drone.latitude ?? order.originLat,
+          pickupLng: drone.longitude ?? order.originLng,
+          dropoffLat: order.destLat,
+          dropoffLng: order.destLng,
+          version: 1,
         });
-        if (order) {
-          order.status = OrderStatus.PENDING_HANDOFF;
-          await manager.save(Order, order);
-
-          // Create handoff job — pickup is at the broken drone's location
-          handoffJob = manager.create(Job, {
-            orderId: order.id,
-            type: JobType.HANDOFF,
-            status: JobStatus.OPEN,
-            pickupLat: drone.latitude ?? order.originLat,
-            pickupLng: drone.longitude ?? order.originLng,
-            dropoffLat: order.destLat,
-            dropoffLng: order.destLng,
-          });
-          handoffJob = await manager.save(Job, handoffJob);
-        }
+        handoffJob = await this.jobRepository.save(newJob);
       }
+    }
 
-      return { drone, handoffJob };
-    });
+    return { drone, handoffJob };
   }
 
   /**

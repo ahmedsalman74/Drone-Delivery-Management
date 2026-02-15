@@ -1,35 +1,34 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  ObjectIdColumn,
+  ObjectId,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToMany,
 } from 'typeorm';
 import { DroneStatus } from '../../common/enums';
-import { Job } from '../../job/entities/job.entity';
 
 @Entity('drones')
 export class Drone {
-  @PrimaryGeneratedColumn('uuid')
+  @ObjectIdColumn()
+  _id!: ObjectId;
+
+  @Column({ unique: true })
   id!: string;
 
   @Column({ unique: true })
   name!: string;
 
-  @Column({
-    type: 'varchar',
-    default: DroneStatus.IDLE,
-  })
+  @Column({ default: DroneStatus.IDLE })
   status!: DroneStatus;
 
-  @Column({ type: 'float', nullable: true })
+  @Column({ nullable: true })
   latitude!: number | null;
 
-  @Column({ type: 'float', nullable: true })
+  @Column({ nullable: true })
   longitude!: number | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ nullable: true })
   lastHeartbeat!: Date | null;
 
   @CreateDateColumn()
@@ -37,7 +36,4 @@ export class Drone {
 
   @UpdateDateColumn()
   updatedAt!: Date;
-
-  @OneToMany(() => Job, (job) => job.drone)
-  jobs!: Job[];
 }
