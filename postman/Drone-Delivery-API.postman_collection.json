@@ -1,0 +1,964 @@
+{
+  "info": {
+    "name": "Drone Delivery Management API",
+    "description": "Complete API collection for the Drone Delivery Management system.\n\nRun requests IN ORDER from top to bottom to test the full delivery lifecycle.\n\nTokens and IDs are auto-saved to environment variables via test scripts.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "1.1 Signup (Enduser)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\",\n  \"name\": \"Alice\",\n  \"type\": \"enduser\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/signup", "host": ["{{baseUrl}}"], "path": ["auth", "signup"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.accessToken) {",
+                  "  pm.environment.set('enduserToken', res.accessToken);",
+                  "}",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Returns accessToken', () => pm.expect(res.accessToken).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.2 Signup (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"adminP@ss123\",\n  \"name\": \"Admin\",\n  \"type\": \"admin\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/signup", "host": ["{{baseUrl}}"], "path": ["auth", "signup"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.accessToken) {",
+                  "  pm.environment.set('adminToken', res.accessToken);",
+                  "}",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Returns accessToken', () => pm.expect(res.accessToken).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.3 Signin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/signin", "host": ["{{baseUrl}}"], "path": ["auth", "signin"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.accessToken) {",
+                  "  pm.environment.set('enduserToken', res.accessToken);",
+                  "}",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns accessToken', () => pm.expect(res.accessToken).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.4 Generate Token (Drone Alpha)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"drone-alpha\",\n  \"type\": \"drone\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/token", "host": ["{{baseUrl}}"], "path": ["auth", "token"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.environment.set('droneAlphaToken', res.accessToken);",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns accessToken', () => pm.expect(res.accessToken).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.5 Generate Token (Drone Beta)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"drone-beta\",\n  \"type\": \"drone\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/token", "host": ["{{baseUrl}}"], "path": ["auth", "token"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.environment.set('droneBetaToken', res.accessToken);",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns accessToken', () => pm.expect(res.accessToken).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.6 Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/forgot-password", "host": ["{{baseUrl}}"], "path": ["auth", "forgot-password"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.resetToken) {",
+                  "  pm.environment.set('resetToken', res.resetToken);",
+                  "}",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns resetToken', () => pm.expect(res.resetToken).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.7 Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"newPassword\": \"newSecureP@ss456\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/reset-password", "host": ["{{baseUrl}}"], "path": ["auth", "reset-password"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Password reset message', () => {",
+                  "  pm.expect(pm.response.json().message).to.include('reset');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.8 Signin (with new password)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"newSecureP@ss456\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/signin", "host": ["{{baseUrl}}"], "path": ["auth", "signin"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.accessToken) {",
+                  "  pm.environment.set('enduserToken', res.accessToken);",
+                  "}",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns accessToken', () => pm.expect(res.accessToken).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.9 Signout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{enduserToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/auth/signout", "host": ["{{baseUrl}}"], "path": ["auth", "signout"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.10 Signin (refresh token after signout)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"newSecureP@ss456\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/signin", "host": ["{{baseUrl}}"], "path": ["auth", "signin"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.accessToken) {",
+                  "  pm.environment.set('enduserToken', res.accessToken);",
+                  "}",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Order Lifecycle",
+      "item": [
+        {
+          "name": "2.1 Submit Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{enduserToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"originLat\": 24.7136,\n  \"originLng\": 46.6753,\n  \"destLat\": 21.3891,\n  \"destLng\": 39.8579\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.environment.set('orderId', res.id);",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Order has id', () => pm.expect(res.id).to.be.a('string'));",
+                  "pm.test('Status is pending', () => pm.expect(res.status).to.eql('pending'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.2 List My Orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{enduserToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.3 Get Order Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{enduserToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/orders/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["orders", "{{orderId}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has order data', () => pm.expect(pm.response.json().order).to.be.an('object'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Drone Operations",
+      "item": [
+        {
+          "name": "3.1 Drone Alpha: Heartbeat",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{droneAlphaToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/drones/heartbeat", "host": ["{{baseUrl}}"], "path": ["drones", "heartbeat"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.drone && res.drone.id) {",
+                  "  pm.environment.set('droneAlphaId', res.drone.id);",
+                  "}",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.2 Drone Alpha: Reserve Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{droneAlphaToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/drones/jobs/reserve", "host": ["{{baseUrl}}"], "path": ["drones", "jobs", "reserve"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.environment.set('jobId', res.id);",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Job reserved', () => pm.expect(res.status).to.eql('reserved'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.3 Drone Alpha: Grab Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{droneAlphaToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/drones/jobs/{{jobId}}/grab", "host": ["{{baseUrl}}"], "path": ["drones", "jobs", "{{jobId}}", "grab"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Job in progress', () => pm.expect(pm.response.json().status).to.eql('in_progress'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.4 Drone Alpha: Complete Job (delivered)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{droneAlphaToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"result\": \"delivered\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/drones/jobs/{{jobId}}/complete", "host": ["{{baseUrl}}"], "path": ["drones", "jobs", "{{jobId}}", "complete"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Job completed', () => pm.expect(pm.response.json().status).to.eql('completed'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.5 Drone Alpha: Get Current Order",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{droneAlphaToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/drones/current-order", "host": ["{{baseUrl}}"], "path": ["drones", "current-order"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 or 404', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Broken Drone & Handoff",
+      "item": [
+        {
+          "name": "4.1 Submit New Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{enduserToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"originLat\": 24.0,\n  \"originLng\": 46.0,\n  \"destLat\": 21.0,\n  \"destLng\": 39.0\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.environment.set('orderId', res.id);",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.2 Drone Alpha: Heartbeat",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{droneAlphaToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 24.0,\n  \"longitude\": 46.0\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/drones/heartbeat", "host": ["{{baseUrl}}"], "path": ["drones", "heartbeat"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"] }
+            }
+          ]
+        },
+        {
+          "name": "4.3 Drone Alpha: Reserve & Grab",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{droneAlphaToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/drones/jobs/reserve", "host": ["{{baseUrl}}"], "path": ["drones", "jobs", "reserve"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.environment.set('jobId', res.id);",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.4 Drone Alpha: Grab Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{droneAlphaToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/drones/jobs/{{jobId}}/grab", "host": ["{{baseUrl}}"], "path": ["drones", "jobs", "{{jobId}}", "grab"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"] }
+            }
+          ]
+        },
+        {
+          "name": "4.5 Drone Alpha: Mark Broken",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{droneAlphaToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/drones/status/broken", "host": ["{{baseUrl}}"], "path": ["drones", "status", "broken"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.handoffJobId) {",
+                  "  pm.environment.set('handoffJobId', res.handoffJobId);",
+                  "}",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Drone marked broken', () => pm.expect(res.drone.status).to.eql('broken'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.6 Drone Beta: Heartbeat",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{droneBetaToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 23.5,\n  \"longitude\": 44.5\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/drones/heartbeat", "host": ["{{baseUrl}}"], "path": ["drones", "heartbeat"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.drone && res.drone.id) {",
+                  "  pm.environment.set('droneBetaId', res.drone.id);",
+                  "}",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.7 Drone Beta: Reserve Handoff Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{droneBetaToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/drones/jobs/reserve", "host": ["{{baseUrl}}"], "path": ["drones", "jobs", "reserve"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.environment.set('handoffJobId', res.id);",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Is handoff job', () => pm.expect(res.type).to.eql('handoff'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.8 Drone Beta: Grab & Deliver",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{droneBetaToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/drones/jobs/{{handoffJobId}}/grab", "host": ["{{baseUrl}}"], "path": ["drones", "jobs", "{{handoffJobId}}", "grab"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"] }
+            }
+          ]
+        },
+        {
+          "name": "4.9 Drone Beta: Complete Handoff",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{droneBetaToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"result\": \"delivered\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/drones/jobs/{{handoffJobId}}/complete", "host": ["{{baseUrl}}"], "path": ["drones", "jobs", "{{handoffJobId}}", "complete"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Job completed', () => pm.expect(pm.response.json().status).to.eql('completed'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.10 Enduser: Verify Delivered",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{enduserToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/orders/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["orders", "{{orderId}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Order delivered', () => pm.expect(pm.response.json().order.status).to.eql('delivered'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Order Withdrawal",
+      "item": [
+        {
+          "name": "5.1 Submit Order (to withdraw)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{enduserToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"originLat\": 25.0,\n  \"originLng\": 47.0,\n  \"destLat\": 22.0,\n  \"destLng\": 40.0\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.environment.set('orderId', res.id);",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.2 Withdraw Order",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{enduserToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/orders/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["orders", "{{orderId}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Order withdrawn', () => pm.expect(pm.response.json().status).to.eql('withdrawn'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Admin Operations",
+      "item": [
+        {
+          "name": "6.1 List All Orders (paginated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/orders?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "orders"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has data array', () => pm.expect(res.data).to.be.an('array'));",
+                  "pm.test('Has meta', () => pm.expect(res.meta).to.be.an('object'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.2 Filter Orders by Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/orders?status=delivered",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "orders"],
+              "query": [
+                { "key": "status", "value": "delivered" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.3 List All Drones",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/admin/drones", "host": ["{{baseUrl}}"], "path": ["admin", "drones"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.4 Update Order Location",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"destLat\": 23.5,\n  \"destLng\": 41.0\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/admin/orders/{{orderId}}/location", "host": ["{{baseUrl}}"], "path": ["admin", "orders", "{{orderId}}", "location"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Note: Will return 400 if order is delivered/withdrawn.",
+                  "// Submit a new pending order first if needed.",
+                  "pm.test('Status is 200 or 400', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.5 Admin: Mark Drone Fixed",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"fixed\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/admin/drones/{{droneAlphaId}}/status", "host": ["{{baseUrl}}"], "path": ["admin", "drones", "{{droneAlphaId}}", "status"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Drone is idle', () => pm.expect(pm.response.json().drone.status).to.eql('idle'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. RBAC Negative Tests",
+      "item": [
+        {
+          "name": "7.1 Enduser cannot access admin orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{enduserToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/admin/orders", "host": ["{{baseUrl}}"], "path": ["admin", "orders"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7.2 Drone cannot submit orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{droneAlphaToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"originLat\": 24.0,\n  \"originLng\": 46.0,\n  \"destLat\": 21.0,\n  \"destLng\": 39.0\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7.3 No token = 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
