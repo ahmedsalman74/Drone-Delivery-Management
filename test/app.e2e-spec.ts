@@ -1,12 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/filters';
 import { DataSource } from 'typeorm';
 
 describe('Drone Delivery API (E2E)', () => {
   let app: INestApplication;
+  let mongoServer: MongoMemoryServer;
 
   // Tokens for different roles
   let adminToken: string;
@@ -15,6 +17,11 @@ describe('Drone Delivery API (E2E)', () => {
   let drone2Token: string;
 
   beforeAll(async () => {
+    // Start in-memory MongoDB (works in CI without external service)
+    mongoServer = await MongoMemoryServer.create();
+    process.env.MONGODB_URI = mongoServer.getUri();
+    process.env.MONGODB_DATABASE = 'test-drone-delivery';
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -55,6 +62,7 @@ describe('Drone Delivery API (E2E)', () => {
 
   afterAll(async () => {
     await app.close();
+    await mongoServer.stop();
   });
 
   // ─── AUTH ───────────────────────────────────────────────
