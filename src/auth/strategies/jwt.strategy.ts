@@ -1,22 +1,46 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { ConfigService } from '@nestjs/config';
+import { AuthService } from '../auth.service';
 import { JwtPayload } from '../../common/decorators/current-user.decorator';
-
-export const JWT_SECRET =
-  process.env.JWT_SECRET || 'drone-delivery-jwt-secret-2024';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(
+    configService: ConfigService,
+    private readonly authService: AuthService,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: JWT_SECRET,
+      secretOrKey: configService.get<string>(
+        'JWT_SECRET',
+        'drone-delivery-jwt-secret-2024',
+      ),
+      passReqToCallback: true,
     });
   }
 
-  validate(payload: JwtPayload): JwtPayload {
+  /**
+   * Validate the JWT payload and check if the token has been blacklisted.
+   * This runs on every authenticated request.
+   */
+  async validate(
+    req: { headers: { authorization?: string } },
+    payload: JwtPayload,
+  ): Promise<JwtPayload> {
+    // Extract the raw token from the Authorization header
+    const token = req.headers.authorization?.replace('Bearer ', '');
+
+    // Check if the token has been blacklisted (user signed out)
+    if (token) {
+      const isBlacklisted = await this.authService.isTokenBlacklisted(token);
+      if (isBlacklisted) {
+        throw new UnauthorizedException('Token has been invalidated');
+      }
+    }
+
     return {
       sub: payload.sub,
       name: payload.name,

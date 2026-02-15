@@ -1,12 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/filters';
 import { DataSource } from 'typeorm';
 
 describe('Drone Delivery API (E2E)', () => {
   let app: INestApplication;
+  let mongoServer: MongoMemoryServer;
 
   // Tokens for different roles
   let adminToken: string;
@@ -15,6 +17,11 @@ describe('Drone Delivery API (E2E)', () => {
   let drone2Token: string;
 
   beforeAll(async () => {
+    // Start in-memory MongoDB (works in CI without external service)
+    mongoServer = await MongoMemoryServer.create();
+    process.env.MONGODB_URI = mongoServer.getUri();
+    process.env.MONGODB_DATABASE = 'test-drone-delivery';
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -31,35 +38,63 @@ describe('Drone Delivery API (E2E)', () => {
     app.useGlobalFilters(new AllExceptionsFilter());
     await app.init();
 
-    // Clear all tables to ensure a clean state between test runs
+    // Clear all collections to ensure a clean state between test runs
     const dataSource = app.get(DataSource);
     const entities = dataSource.entityMetadatas;
     for (const entity of entities) {
-      const repository = dataSource.getRepository(entity.name);
-      await repository.clear();
+      const repository = dataSource.getMongoRepository(entity.name);
+      await repository.deleteMany({});
     }
-  });
+
+    // Bootstrap: sign up an admin user to get an admin token
+    // This token is needed to call POST /auth/token (admin-only endpoint)
+    const adminSignup = await request(app.getHttpServer())
+      .post('/auth/signup')
+      .send({
+        email: 'admin@test.com',
+        password: 'Admin123!',
+        name: 'admin-user',
+        type: 'admin',
+      })
+      .expect(201);
+    adminToken = adminSignup.body.accessToken;
+  }, 60000);
 
   afterAll(async () => {
     await app.close();
+    await mongoServer.stop();
   });
 
   // ─── AUTH ───────────────────────────────────────────────
 
   describe('Auth - POST /auth/token', () => {
-    it('should generate a token for admin', async () => {
-      const res = await request(app.getHttpServer())
+    it('should reject unauthenticated token generation', async () => {
+      await request(app.getHttpServer())
         .post('/auth/token')
-        .send({ name: 'admin-user', type: 'admin' })
-        .expect(200);
-
-      expect(res.body.accessToken).toBeDefined();
-      adminToken = res.body.accessToken;
+        .send({ name: 'drone-alpha', type: 'drone' })
+        .expect(401);
     });
 
-    it('should generate a token for enduser', async () => {
+    it('should reject non-admin token generation', async () => {
+      // Generate an enduser token first
+      const enduserRes = await request(app.getHttpServer())
+        .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'temp-user', type: 'enduser' })
+        .expect(200);
+
+      // Enduser should not be able to generate tokens
+      await request(app.getHttpServer())
+        .post('/auth/token')
+        .set('Authorization', `Bearer ${enduserRes.body.accessToken}`)
+        .send({ name: 'drone-alpha', type: 'drone' })
+        .expect(403);
+    });
+
+    it('should generate a token for enduser (admin auth)', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'user-alice', type: 'enduser' })
         .expect(200);
 
@@ -67,9 +102,10 @@ describe('Drone Delivery API (E2E)', () => {
       enduserToken = res.body.accessToken;
     });
 
-    it('should generate a token for drone', async () => {
+    it('should generate a token for drone (admin auth)', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'drone-alpha', type: 'drone' })
         .expect(200);
 
@@ -77,9 +113,10 @@ describe('Drone Delivery API (E2E)', () => {
       droneToken = res.body.accessToken;
     });
 
-    it('should generate a token for second drone', async () => {
+    it('should generate a token for second drone (admin auth)', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'drone-beta', type: 'drone' })
         .expect(200);
 
@@ -89,6 +126,7 @@ describe('Drone Delivery API (E2E)', () => {
     it('should reject invalid type', async () => {
       await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'test', type: 'invalid' })
         .expect(400);
     });
@@ -96,6 +134,7 @@ describe('Drone Delivery API (E2E)', () => {
     it('should reject missing name', async () => {
       await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ type: 'admin' })
         .expect(400);
     });
@@ -399,6 +438,23 @@ describe('Drone Delivery API (E2E)', () => {
   // ─── ADMIN ENDPOINTS ───────────────────────────────────
 
   describe('Admin Endpoints', () => {
+    // Refresh tokens to ensure they're valid after all prior tests
+    beforeAll(async () => {
+      const adminRes = await request(app.getHttpServer())
+        .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'admin-user', type: 'admin' })
+        .expect(200);
+      adminToken = adminRes.body.accessToken;
+
+      const enduserRes = await request(app.getHttpServer())
+        .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'user-alice', type: 'enduser' })
+        .expect(200);
+      enduserToken = enduserRes.body.accessToken;
+    });
+
     it('admin: should list all orders in bulk', async () => {
       const res = await request(app.getHttpServer())
         .get('/admin/orders')
@@ -516,6 +572,30 @@ describe('Drone Delivery API (E2E)', () => {
   // ─── EDGE CASES ────────────────────────────────────────
 
   describe('Edge Cases', () => {
+    // Refresh tokens to ensure they're valid after all prior tests
+    beforeAll(async () => {
+      const enduserRes = await request(app.getHttpServer())
+        .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'user-alice', type: 'enduser' })
+        .expect(200);
+      enduserToken = enduserRes.body.accessToken;
+
+      const droneRes = await request(app.getHttpServer())
+        .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'drone-alpha', type: 'drone' })
+        .expect(200);
+      droneToken = droneRes.body.accessToken;
+
+      const drone2Res = await request(app.getHttpServer())
+        .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'drone-beta', type: 'drone' })
+        .expect(200);
+      drone2Token = drone2Res.body.accessToken;
+    });
+
     it('should reject order withdrawal after pickup', async () => {
       // Submit order
       const orderRes = await request(app.getHttpServer())
@@ -556,9 +636,10 @@ describe('Drone Delivery API (E2E)', () => {
     });
 
     it('should prevent other user from viewing orders', async () => {
-      // Create second enduser
+      // Create second enduser (requires admin token)
       const user2Res = await request(app.getHttpServer())
         .post('/auth/token')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'user-bob', type: 'enduser' })
         .expect(200);
 

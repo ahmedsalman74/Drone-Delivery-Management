@@ -4,9 +4,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere } from 'typeorm';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { MongoRepository } from 'typeorm';
+import { randomUUID } from 'crypto';
 import { Order } from '../order/entities/order.entity';
 import { Drone } from '../drone/entities/drone.entity';
 import { Job } from '../job/entities/job.entity';
@@ -19,11 +18,11 @@ import { OrderStatus, DroneStatus, JobStatus, JobType } from '../common/enums';
 export class AdminService {
   constructor(
     @InjectRepository(Order)
-    private readonly orderRepository: Repository<Order>,
+    private readonly orderRepository: MongoRepository<Order>,
     @InjectRepository(Drone)
-    private readonly droneRepository: Repository<Drone>,
-    @InjectDataSource()
-    private readonly dataSource: DataSource,
+    private readonly droneRepository: MongoRepository<Drone>,
+    @InjectRepository(Job)
+    private readonly jobRepository: MongoRepository<Job>,
   ) {}
 
   /**
@@ -34,7 +33,7 @@ export class AdminService {
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    const where: FindOptionsWhere<Order> = {};
+    const where: Record<string, unknown> = {};
     if (query.status) {
       where.status = query.status;
     }
@@ -125,58 +124,59 @@ export class AdminService {
         throw new BadRequestException('Drone is already broken');
       }
 
-      return this.dataSource.transaction(async (manager) => {
-        drone.status = DroneStatus.BROKEN;
-        await manager.save(Drone, drone);
+      drone.status = DroneStatus.BROKEN;
+      await this.droneRepository.save(drone);
 
-        // Find active job
-        const activeJob = await manager.findOne(Job, {
-          where: [
-            { droneId: drone.id, status: JobStatus.RESERVED },
-            { droneId: drone.id, status: JobStatus.IN_PROGRESS },
-          ],
-          relations: ['order'],
+      // Find active job — check RESERVED first, then IN_PROGRESS
+      let activeJob = await this.jobRepository.findOne({
+        where: { droneId: drone.id, status: JobStatus.RESERVED },
+      });
+      if (!activeJob) {
+        activeJob = await this.jobRepository.findOne({
+          where: { droneId: drone.id, status: JobStatus.IN_PROGRESS },
+        });
+      }
+
+      let handoffJob: Job | undefined;
+
+      if (activeJob) {
+        activeJob.status = JobStatus.FAILED;
+        await this.jobRepository.save(activeJob);
+
+        const order = await this.orderRepository.findOne({
+          where: { id: activeJob.orderId },
         });
 
-        let handoffJob: Job | undefined;
-
-        if (activeJob) {
-          activeJob.status = JobStatus.FAILED;
-          await manager.save(Job, activeJob);
-
-          const order = await manager.findOne(Order, {
-            where: { id: activeJob.orderId },
-          });
-
-          if (!order) {
-            throw new NotFoundException(
-              `Order ${activeJob.orderId} not found for active job ${activeJob.id}`,
-            );
-          }
-
-          if (drone.latitude == null || drone.longitude == null) {
-            throw new BadRequestException(
-              'Drone position is unknown; cannot create handoff job',
-            );
-          }
-
-          order.status = OrderStatus.PENDING_HANDOFF;
-          await manager.save(Order, order);
-
-          handoffJob = manager.create(Job, {
-            orderId: order.id,
-            type: JobType.HANDOFF,
-            status: JobStatus.OPEN,
-            pickupLat: drone.latitude,
-            pickupLng: drone.longitude,
-            dropoffLat: order.destLat,
-            dropoffLng: order.destLng,
-          });
-          handoffJob = await manager.save(Job, handoffJob);
+        if (!order) {
+          throw new NotFoundException(
+            `Order ${activeJob.orderId} not found for active job ${activeJob.id}`,
+          );
         }
 
-        return { drone, handoffJob };
-      });
+        if (drone.latitude == null || drone.longitude == null) {
+          throw new BadRequestException(
+            'Drone position is unknown; cannot create handoff job',
+          );
+        }
+
+        order.status = OrderStatus.PENDING_HANDOFF;
+        await this.orderRepository.save(order);
+
+        const newJob = this.jobRepository.create({
+          id: randomUUID(),
+          orderId: order.id,
+          type: JobType.HANDOFF,
+          status: JobStatus.OPEN,
+          pickupLat: drone.latitude,
+          pickupLng: drone.longitude,
+          dropoffLat: order.destLat,
+          dropoffLng: order.destLng,
+          version: 1,
+        });
+        handoffJob = await this.jobRepository.save(newJob);
+      }
+
+      return { drone, handoffJob };
     } else {
       // FIXED — set to IDLE, handoff job stays open (see JSDoc above)
       if (drone.status !== DroneStatus.BROKEN) {

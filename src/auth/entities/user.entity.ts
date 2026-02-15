@@ -6,33 +6,27 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { OrderStatus } from '../../common/enums';
+import { UserType } from '../../common/enums';
 
-@Entity('orders')
-export class Order {
+@Entity('users')
+export class User {
   @ObjectIdColumn()
   _id!: ObjectId;
 
   @Column({ unique: true })
   id!: string;
 
-  @Column()
-  submittedBy!: string;
+  @Column({ unique: true })
+  email!: string;
 
   @Column()
-  originLat!: number;
+  password!: string;
 
   @Column()
-  originLng!: number;
+  name!: string;
 
-  @Column()
-  destLat!: number;
-
-  @Column()
-  destLng!: number;
-
-  @Column({ default: OrderStatus.PENDING })
-  status!: OrderStatus;
+  @Column({ default: UserType.ENDUSER })
+  type!: UserType;
 
   @CreateDateColumn()
   createdAt!: Date;

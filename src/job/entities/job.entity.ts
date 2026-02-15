@@ -1,20 +1,19 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  ObjectIdColumn,
+  ObjectId,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
-  VersionColumn,
 } from 'typeorm';
 import { JobStatus, JobType } from '../../common/enums';
-import { Order } from '../../order/entities/order.entity';
-import { Drone } from '../../drone/entities/drone.entity';
 
 @Entity('jobs')
 export class Job {
-  @PrimaryGeneratedColumn('uuid')
+  @ObjectIdColumn()
+  _id!: ObjectId;
+
+  @Column({ unique: true })
   id!: string;
 
   @Column()
@@ -23,31 +22,25 @@ export class Job {
   @Column({ nullable: true })
   droneId!: string | null;
 
-  @Column({
-    type: 'varchar',
-    default: JobStatus.OPEN,
-  })
+  @Column({ default: JobStatus.OPEN })
   status!: JobStatus;
 
-  @Column({
-    type: 'varchar',
-    default: JobType.DELIVERY,
-  })
+  @Column({ default: JobType.DELIVERY })
   type!: JobType;
 
-  @Column({ type: 'float' })
+  @Column()
   pickupLat!: number;
 
-  @Column({ type: 'float' })
+  @Column()
   pickupLng!: number;
 
-  @Column({ type: 'float' })
+  @Column()
   dropoffLat!: number;
 
-  @Column({ type: 'float' })
+  @Column()
   dropoffLng!: number;
 
-  @VersionColumn()
+  @Column({ default: 1 })
   version!: number;
 
   @CreateDateColumn()
@@ -56,14 +49,7 @@ export class Job {
   @UpdateDateColumn()
   updatedAt!: Date;
 
-  @ManyToOne(() => Order, (order) => order.jobs, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'orderId' })
-  order!: Order;
-
-  @ManyToOne(() => Drone, (drone) => drone.jobs, {
-    nullable: true,
-    onDelete: 'SET NULL',
-  })
-  @JoinColumn({ name: 'droneId' })
-  drone!: Drone | null;
+  // Populated manually in services (not a DB relation in MongoDB)
+  order?: import('../../order/entities/order.entity').Order;
+  drone?: import('../../drone/entities/drone.entity').Drone | null;
 }
