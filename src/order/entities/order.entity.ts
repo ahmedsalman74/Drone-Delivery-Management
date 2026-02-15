@@ -1,38 +1,37 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  ObjectIdColumn,
+  ObjectId,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToMany,
 } from 'typeorm';
 import { OrderStatus } from '../../common/enums';
-import { Job } from '../../job/entities/job.entity';
 
 @Entity('orders')
 export class Order {
-  @PrimaryGeneratedColumn('uuid')
+  @ObjectIdColumn()
+  _id!: ObjectId;
+
+  @Column({ unique: true })
   id!: string;
 
   @Column()
   submittedBy!: string;
 
-  @Column({ type: 'float' })
+  @Column()
   originLat!: number;
 
-  @Column({ type: 'float' })
+  @Column()
   originLng!: number;
 
-  @Column({ type: 'float' })
+  @Column()
   destLat!: number;
 
-  @Column({ type: 'float' })
+  @Column()
   destLng!: number;
 
-  @Column({
-    type: 'varchar',
-    default: OrderStatus.PENDING,
-  })
+  @Column({ default: OrderStatus.PENDING })
   status!: OrderStatus;
 
   @CreateDateColumn()
@@ -40,7 +39,4 @@ export class Order {
 
   @UpdateDateColumn()
   updatedAt!: Date;
-
-  @OneToMany(() => Job, (job) => job.order)
-  jobs!: Job[];
 }
